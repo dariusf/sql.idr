@@ -3,52 +3,77 @@ module SQL
 
 import Data.HVect
 
-Table : Vect n Type -> Type
-Table = HVect
+-- Tables
+
+record Table (xs : Vect n Type) where
+  constructor MkTable
+  names : List String
+  types : HVect xs
+
+table : String -> HVect xs -> Table xs
+table x y = MkTable [x] y
+
+product : List String -> HVect xs -> Table xs
+product = MkTable
+
+Show (Table xs) where
+  show = pack . intercalate [',', ' '] . map unpack . toList . names
+
+-- Is there a more precise name?
+merge : Table xs -> Table ys -> Table (xs ++ ys)
+merge xs ys = product (names xs ++ names ys) (types xs ++ types ys)
+
+-- Rows
 
 Row : Vect n Type -> Type
 Row = HVect
 
+-- SQL
+
 data SQL : Table xs -> Type where
-  From : (a : Table xs) -> (b : Table ys) -> SQL (a ++ b)
+  From : (a : Table xs) -> (b : Table ys) -> SQL (merge a b)
+
+Show (SQL t) where
+  show (From a b) = "(select * from " ++ show a ++ ", " ++ show b ++ ")"
 
 -- Domain types
+
 data PersonId = Id Int
+Show PersonId where
+  show (Id n) = show n
+
 data Person = Elizabeth
+Show Person where
+  show _ = "Elizabeth"
+
 data Birthday = Day String
+Show Birthday where
+  show (Day s) = s
 
--- Table definitions. Probably can be generated somehow
+-- Table definitions. Probably can be generated somehow?
+
 people : Table [Type, Type]
-people = [PersonId, Person]
-
-people1 : Table [PersonId, Person]
-people1 = [Id 1, Elizabeth]
+people = table "people" [PersonId, Person]
 
 birthdays : Table [Type, Type]
-birthdays = [PersonId, Birthday]
+birthdays = table "birthdays" [PersonId, Birthday]
 
 -- An SQL fragment. Needs to be run to produce a value
-fromClause : SQL [PersonId, Person, PersonId, Birthday]
+
+fromClause : SQL (product ["people", "birthdays"] [PersonId, Person, PersonId, Birthday])
 fromClause = From people birthdays
 
-TupleVect : (n:Nat) -> Type -> Type
-TupleVect Z t = ()
-TupleVect (S k) t = (t, TupleVect k t)
+-- Example usage
 
-testTV : TupleVect 4 Nat
-testTV = (1, 2, 3, 4, ())
+-- This should probably be more generic
+runSQL : SQL (product ["people", "birthdays"] [PersonId, Person, PersonId, Birthday]) ->
+          IO (List (Row [PersonId, Person, PersonId, Birthday]))
+runSQL sql = do
+  printLn $ "running: " ++ show sql
+  pure [
+    [Id 1, Elizabeth, Id 2, Day "asd"],
+    [Id 2, Elizabeth, Id 3, Day "lkj"]]
 
-runSQL : {xs : HVect ts} -> SQL xs -> List (HVect ts)
-runSQL {xs} _ = [xs, xs]
-
-result : (PersonId, Person, PersonId, Birthday)
-result = (Id 1, Elizabeth, Id 1, Day "monday")
-
--- This is a better idea than tuples
-result1 : HVect [PersonId, Person, PersonId, Birthday]
-result1 = [Id 1, Elizabeth, Id 1, Day "monday"]
-
--- How to cover the concrete types?
-howToRecover : (List (HVect [Type, Type, Type, Type]))
-howToRecover = runSQL fromClause
-
+main : IO ()
+main = do
+  runSQL fromClause >>= printLn
