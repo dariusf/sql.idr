@@ -5,14 +5,21 @@ import Data.HVect
 
 -- Tables
 
+||| Tables/relations.
 record Table (xs : Vect n Type) where
   constructor MkTable
+
+  ||| The names of constituent tables.
   names : List String
   types : HVect xs
 
+-- TODO labels/extensible records http://lpaste.net/104020
+
+||| Constructor for a single table
 table : String -> HVect xs -> Table xs
 table x y = MkTable [x] y
 
+||| Constructor for a product of tables
 product : List String -> HVect xs -> Table xs
 product = MkTable
 
@@ -50,7 +57,7 @@ data Birthday = Day String
 Show Birthday where
   show (Day s) = s
 
--- Table definitions. Probably can be generated somehow?
+-- Table definitions
 
 people : Table [Type, Type]
 people = table "people" [PersonId, Person]
@@ -65,7 +72,7 @@ fromClause = From people birthdays
 
 -- Example usage
 
--- This should probably be more generic
+-- TODO make this more generic
 runSQL : SQL (product ["people", "birthdays"] [PersonId, Person, PersonId, Birthday]) ->
           IO (List (Row [PersonId, Person, PersonId, Birthday]))
 runSQL sql = do
