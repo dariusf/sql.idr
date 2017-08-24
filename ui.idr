@@ -36,11 +36,11 @@ Line x = Vect x Char
 Grid : Nat -> Nat -> Type
 Grid x y = Vect y (Line x)
 
-adj : Grid x y -> Grid x y -> Grid (x + x) y
+adj : Grid x y -> Grid z y -> Grid (x + z) y
 adj [] [] = []
 adj (x :: xs) (y :: ys) = (x ++ y) :: adj xs ys
 
-stack : Grid x y -> Grid x y -> Grid x (y + y)
+stack : Grid x y -> Grid x z -> Grid x (y + z)
 stack [] [] = []
 stack xs ys = xs ++ ys
 
@@ -57,7 +57,6 @@ overlay (x :: xs) (y :: ys) = ol x y :: overlay xs ys
 render'' : Grid x y -> String
 render'' = unlines . toList . map pack
 
--- TODO why does this work without dependent pairs?
 ltv : (xs : List a) -> Vect (length xs) a
 ltv [] = []
 ltv (x :: xs) = x :: ltv xs
@@ -86,8 +85,50 @@ padGrid x y xss = pad (replicate x ' ') y $ map (pad ' ' x) xss
 hline : (edge : Char) -> (body : Char) -> (n : Nat) -> {auto np : 2 `LTE` n} -> String
 hline e b n = with List (pack (e :: (replicate (n - 2) b) ++ [e]))
 
+hline' : (edge : Char) -> (body : Char) -> (n : Nat) -> {auto np : 2 `LTE` n} -> Line n
+hline' e b n =
+  case decEq n (S (n - 2 + 1)) of
+    Yes p => rewrite p in (e :: (replicate (n - 2) b) ++ [e])
+    No _ => idris_crash ":("
+
 drawBox : (x : Nat) -> (y : Nat) -> {auto xp : 2 `LTE` x} -> {auto yp : 2 `LTE` y} -> List String
 drawBox x y = hline '+' '-' x :: (replicate (y - 2) $ hline '|' ' ' x) ++ [hline '+' '-' x]
+
+drawBox' : (x : Nat) -> (y : Nat) -> {auto xp : 2 `LTE` x} -> {auto yp : 2 `LTE` y} -> Grid x y
+drawBox' x y =
+  case decEq y (S (y - 2 + 1)) of
+    Yes p => rewrite p in hline' '+' '-' x :: (replicate (y - 2) $ hline' '|' ' ' x) ++ [hline' '+' '-' x]
+    No _ => idris_crash ":("
+
+render2 : (x : Nat) -> (y : Nat) -> {auto xp : 2 `LTE` x} -> {auto yp : 2 `LTE` y} -> Layout -> Grid x y
+render2 x y (Only z) = drawBox' x y
+render2 x y (Adj z w s) =
+  case (mul z x) `isLTE` x of
+    Yes _ =>
+      case 2 `isLTE` (mul z x) of
+        Yes _ =>
+          case 2 `isLTE` (x - mul z x) of
+            Yes _ =>
+              case decEq x (mul z x + (x - mul z x)) of
+                Yes p => rewrite p in adj (render2 (mul z x) y w) (render2 (x - mul z x) y s)
+                No _ => idris_crash ":\\"
+            No _ => ?uh
+        No _ => ?wut
+    No _ => ?huh
+render2 x y (Stack z w s) =
+  case (mul z y) `isLTE` y of
+    Yes _ =>
+      case 2 `isLTE` (mul z y) of
+        Yes _ =>
+          case 2 `isLTE` (y - mul z y) of
+            Yes _ =>
+              case decEq y (mul z y + (y - mul z y)) of
+                Yes p => rewrite p in render2 x (mul z y) w ++ render2 x (y - mul z y) s
+                No _ => idris_crash "/:"
+            No _ => ?ugh
+        No _ => ?alksdj
+    No _ => ?asd
+-- render2 x y (Overlay z w) = ?overlay
 
 render' : (x : Nat) -> (y : Nat) -> {auto xp : 2 `LTE` x} -> {auto yp : 2 `LTE` y} -> Layout -> List String
 render' x y (Only z) = drawBox x y
@@ -120,3 +161,6 @@ main : IO ()
 main = do
   putStrLn $ render 6 6 $ Only Box
   putStrLn $ render 80 25 $ Adj (1 // 2) (Only Box) (Stack (1 // 3) (Only Box) (Only Box))
+
+  putStrLn $ render'' $ render2 6 6 $ Only Box
+  putStrLn $ render'' $ render2 80 25 $ Adj (1 // 2) (Only Box) (Stack (1 // 3) (Only Box) (Only Box))
