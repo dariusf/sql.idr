@@ -1,4 +1,7 @@
 
+import Data.Vect
+import Data.So
+
 infixl 6 //
 data Ratio = (//) Nat Nat
 
@@ -27,8 +30,61 @@ combine [] (x :: xs) = x :: (combine [] xs)
 combine (x :: xs) [] = x :: (combine xs [])
 combine (x :: xs) (y :: ys) = (x ++ y) :: combine xs ys
 
+Line : Nat -> Type
+Line x = Vect x Char
+
+Grid : Nat -> Nat -> Type
+Grid x y = Vect y (Line x)
+
+adj : Grid x y -> Grid x y -> Grid (x + x) y
+adj [] [] = []
+adj (x :: xs) (y :: ys) = (x ++ y) :: adj xs ys
+
+stack : Grid x y -> Grid x y -> Grid x (y + y)
+stack [] [] = []
+stack xs ys = xs ++ ys
+
+||| The left argument goes on top
+overlay : Grid x y -> Grid x y -> Grid x y
+overlay [] [] = []
+overlay (x :: xs) (y :: ys) = ol x y :: overlay xs ys
+  where
+    ol : Line n -> Line n -> Line n
+    ol [] [] = []
+    ol (' ' :: xs) (y :: ys) = y :: ol xs ys
+    ol (x :: xs) (_ :: ys) = x :: ol xs ys
+
+render'' : Grid x y -> String
+render'' = unlines . toList . map pack
+
+-- TODO why does this work without dependent pairs?
+ltv : (xs : List a) -> Vect (length xs) a
+ltv [] = []
+ltv (x :: xs) = x :: ltv xs
+
+pad : a -> (n : Nat) -> List a -> Vect n a
+pad a n xs =
+  let xn = length xs in
+  case xn `isLTE` n of
+    Yes _ =>
+      let left = (n - xn) / 2 in
+      case left `isLTE` (n - xn) of
+        Yes _ =>
+          let right = (n - xn) - left in
+          -- case choose (n == left + length xs + right) of
+          case decEq n (left + (length xs + right)) of
+            Yes p =>
+              rewrite p in
+              replicate left a ++ ltv xs ++ replicate right a
+            No _ => ?uhoh
+        No _ => ?dead2
+    No _ => ?dead1
+
+padGrid : (x : Nat) -> (y : Nat) -> List (List Char) -> Grid x y
+padGrid x y xss = pad (replicate x ' ') y $ map (pad ' ' x) xss
+
 hline : (edge : Char) -> (body : Char) -> (n : Nat) -> {auto np : 2 `LTE` n} -> String
-hline e b n = pack (e :: (replicate (n - 2) b) ++ [e])
+hline e b n = with List (pack (e :: (replicate (n - 2) b) ++ [e]))
 
 drawBox : (x : Nat) -> (y : Nat) -> {auto xp : 2 `LTE` x} -> {auto yp : 2 `LTE` y} -> List String
 drawBox x y = hline '+' '-' x :: (replicate (y - 2) $ hline '|' ' ' x) ++ [hline '+' '-' x]
