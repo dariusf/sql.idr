@@ -94,11 +94,22 @@ hline' e b n =
 drawBox : (x : Nat) -> (y : Nat) -> {auto xp : 2 `LTE` x} -> {auto yp : 2 `LTE` y} -> List String
 drawBox x y = hline '+' '-' x :: (replicate (y - 2) $ hline '|' ' ' x) ++ [hline '+' '-' x]
 
+plusMinusElim : (n : Nat) -> {auto np : 1 `LTE` n} -> n = (n - 1) + 1
+plusMinusElim Z impossible
+plusMinusElim (S k) =
+  rewrite minusZeroRight k in
+  rewrite plusCommutative k 1 in
+  Refl
+
+sigh : (y : Nat) -> {auto yp : 2 `LTE` y} -> y = (S (y - 2 + 1))
+sigh Z impossible
+sigh (S y') {yp = (LTESucc _)} =
+  rewrite plusMinusElim y' in Refl
+
 drawBox' : (x : Nat) -> (y : Nat) -> {auto xp : 2 `LTE` x} -> {auto yp : 2 `LTE` y} -> Grid x y
 drawBox' x y =
-  case decEq y (S (y - 2 + 1)) of
-    Yes p => rewrite p in hline' '+' '-' x :: (replicate (y - 2) $ hline' '|' ' ' x) ++ [hline' '+' '-' x]
-    No _ => idris_crash ":("
+  rewrite sigh y in
+  hline' '+' '-' x :: (replicate (y - 2) $ hline' '|' ' ' x) ++ [hline' '+' '-' x]
 
 render2 : (x : Nat) -> (y : Nat) -> {auto xp : 2 `LTE` x} -> {auto yp : 2 `LTE` y} -> Layout -> Grid x y
 render2 x y (Only z) = drawBox' x y
